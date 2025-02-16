@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Neon Ball Escape with Sound</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: black;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  // Параметры круга-стены
+  const circleRadius = 175;
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+
+  // Создаём объект для звука столкновения
+  const collisionSound = new Audio("collision.mp3");
+
+  let particles = [];
+
+  class Ball {
+    constructor() {
+      // Изначальное положение шарика
+      this.x = centerX;
+      this.y = centerY - 80;
+      this.vx = (Math.random() - 0.5) * 8;
+      this.vy = (Math.random() - 0.5) * 8;
+      this.baseRadius = 15;
+      this.radius = this.baseRadius;
+      this.color = "cyan";
+      this.growing = false; // флаг для эффекта роста
+      this.collided = false; // флаг, чтобы звук не проигрывался постоянно
+    }
+
+    move() {
+      this.x += this.vx;
+      this.y += this.vy;
+
+      const dist = Math.hypot(this.x - centerX, this.y - centerY);
+
+      if (dist + this.radius >= circleRadius) {
+        // Если столкновение происходит впервые, воспроизводим звук
+        if (!this.collided) {
+          collisionSound.currentTime = 0; // сбрасываем звук для мгновенного повтора
+          collisionSound.play();
+          this.collided = true;
+        }
+
+        // Вычисляем нормаль столкновения
+        let nx = (this.x - centerX) / dist;
+        let ny = (this.y - centerY) / dist;
+        // Отражаем вектор скорости: v' = v - 2*(v·n)*n
+        let dot = this.vx * nx + this.vy * ny;
+        this.vx = this.vx - 2 * dot * nx;
+        this.vy = this.vy - 2 * dot * ny;
+
+        // Корректируем позицию, чтобы избежать "залипания"
+        let overlap = dist + this.radius - circleRadius;
+        this.x -= overlap * nx;
+        this.y -= overlap * ny;
+
+        if (!this.growing && this.radius <= this.baseRadius) {
+          this.growing = true;
+          createParticles(this.x, this.y);
+        }
+      } else {
+        // Сбрасываем флаг, когда шарик уже не в зоне столкновения
+        this.collided = false;
+      }
+
+      // Логика роста и уменьшения радиуса
+      if (this.growing) {
+        this.radius += 2;
+        if (this.radius >= this.baseRadius * 1.5) {
+          this.growing = false;
+        }
+      } else if (this.radius > this.baseRadius) {
+        this.radius -= 1;
+        if (this.radius < this.baseRadius) {
+          this.radius = this.baseRadius;
+        }
+      }
+    }
+
+    draw() {
+      ctx.save();
+      ctx.shadowColor = this.color;
+      ctx.shadowBlur = 20;
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  class Particle {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+      this.vx = (Math.random() - 0.5) * 4;
+      this.vy = (Math.random() - 0.5) * 4;
+      this.life = Math.random() * 20 + 10;
+      this.radius = Math.random() * 3 + 1;
+      this.color = "cyan";
+    }
+
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      this.life -= 1;
+    }
+
+    draw() {
+      ctx.save();
+      ctx.shadowColor = this.color;
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  function createParticles(x, y) {
+    for (let i = 0; i < 10; i++) {
+      particles.push(new Particle(x, y));
+    }
+  }
+
+  let ball = new Ball();
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Рисуем неоновый круг-стену
+    ctx.save();
+    ctx.strokeStyle = "blue";
+    ctx.lineWidth = 5;
+    ctx.shadowColor = "blue";
+    ctx.shadowBlur = 20;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ball.move();
+    ball.draw();
+
+    particles.forEach((particle, index) => {
+      particle.update();
+      particle.draw();
+      if (particle.life <= 0) {
+        particles.splice(index, 1);
+      }
+    });
+
+    requestAnimationFrame(animate);
+  }
+
+  animate();
+</script>
+</body>
+</html>
